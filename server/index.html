@@ -374,7 +374,7 @@
                     i++;
 
                     continue;
-                }else if(msg[i] == ":" && !openEmoji) {
+                }else if(msg[i] == ":" && !openEmoji && false) {
                     openEmoji = true;
                     emoji = "";
 
@@ -392,7 +392,7 @@
                     el.remove();
 
                     continue;
-                }else if(msg[i] == ":" && openEmoji) {
+                }else if(msg[i] == ":" && openEmoji && false /* emojis temporarily disabled due to bug*/) {
                     openEmoji = false;
 
                     var parentDiv = document.createElement("div");
