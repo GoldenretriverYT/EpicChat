@@ -1,0 +1,333 @@
+<head>
+    <title>Epic Chat</title>
+    <script src="socketio.js"></script>
+    <style>
+        * {
+            font-family: Arial;
+        }
+
+        body {
+            margin: 0px;
+            overflow: hidden;
+        }
+
+        .message {
+            font-size: 16px;
+            line-height: 24px;
+            background-color: #d1d1d1;
+            border-radius: 3px;
+            overflow-wrap: break-word;
+        }
+
+        .message:nth-child(2n) {
+            background-color: #e9e9e9;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        var socket = io();
+        var ownUsername = "Pending";
+        var config = {};
+
+        const params = new URLSearchParams(window.location.search);
+
+        var errors = {
+            "set username": {
+                "TOO_LONG": "Username too long - your username can only be {0} characters long",
+                "ERROR": "An unknown error occurred.",
+                "NAME_TOOK": "This name is already in use."
+            },
+            "send message": {
+                "NO_USERNAME": "You don't have an username yet. Use <i>/username &lt;username&gt;</i> to set your username.",
+                "MSG_LEN": "Your message is either too short (<1 chars) or too long (>{0} chars)."
+            }
+        }
+
+        window.addEventListener("keypress", (ev) => {
+            if(ev.key == "Enter") {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            console.log("Sending message...");
+            var msg = document.getElementById("msginput").value;
+            document.getElementById("msginput").value = "";
+
+            if(msg.startsWith("/")) {
+                var args = msg.split(" ");
+
+                if(args[0] == "/username") {
+                    socket.emit("set username", args[1], (data) => {
+                        if(data == "OK") {
+                            ownUsername = args[1];
+                            localStorage.setItem("usernameSaved", ownUsername);
+
+                            addMessage({
+                                "username": "System-Bot",
+                                "isAdmin": true,
+                                "msg": "Your username was changed to " + args[1]
+                            });
+                        }else {
+                            addMessage({
+                                "username": "System-Bot",
+                                "isAdmin": true,
+                                "msg": replacePlaceholders(errors["set username"][data], config.maxUsernameLength)
+                            });
+                        }
+                    });
+
+                    return;
+                }else if(args[0] == "/login") {
+                    addMessage({
+                        "username": "System-Bot",
+                        "isAdmin": true,
+                        "msg": "To prevent accidental sending, this command was disabled."
+                    });
+
+                    return;
+                }else if(args[0] == "/online") {
+                    socket.emit("get online", null, (data) => {
+                        var userStrings = [];
+
+                        data.forEach((user) => {
+                            if(user.isAdmin) {
+                                userStrings.push(`<span style="color: red">[Admin] </span><strong>${user.username}</strong>`);
+                            }else {
+                                userStrings.push(`<strong>${user.username}</strong>`);
+                            }
+                        });
+
+                        addMessage({
+                            "username": "System-Bot",
+                            "isAdmin": true,
+                            "msg": "Users online (" + userStrings.length + "): " + userStrings.join(", ")
+                        });
+                    });
+
+                    return;
+                }
+                
+                addMessage({
+                    "username": "System-Bot",
+                    "isAdmin": true,
+                    "msg": "Invalid command."
+                });
+
+                return;
+            }
+
+            socket.emit("send message", msg, (res) => {
+                if(res == "OK") {
+                    console.log("message was sent");
+                }else {
+                    addMessage({
+                        "username": "System-Bot",
+                        "msg": replacePlaceholders(errors["send message"][res], config.maxMessageLength)
+                    });
+                }
+            });
+        }
+
+        socket.on("emit message", (data) => {
+            if(!focused) newUnread = true;
+
+            var newMessage = "";
+
+            var openStrong = false;
+
+            var openImage = false;
+            var imgUrl = "";
+
+            var openURL = false;
+            var url = "";
+
+            for(var i = 0; i < data.message.length; i++) { // this is prob inefficient but i am too lazy to do regex stuff
+                if(data.message[i] == "*" && config.allowBold) {
+                    if(openStrong) {
+                        openStrong = false;
+                        newMessage += "</strong>";
+                    }else {
+                        openStrong = true;
+                        newMessage += "<strong>";
+                    }
+
+                    continue;
+                }else if(data.message[i] == "[" && data.message.length > i && data.message[i+1] == "!" && !openImage && config.allowImages) {
+                    openImage = true;
+                    imgUrl = "";
+                    i++;
+
+                    continue;
+                }else if(data.message[i] == "[" && data.message.length > i && (data.message[i+1] == "~") && !openURL && config.allowLinks) {
+                    openURL = true;
+                    url = "";
+                    i++;
+
+                    continue;
+                }else if(data.message[i] == "]" && openImage && config.allowImages) {
+                    openImage = false;
+
+                    var el = document.createElement("img");
+
+                    el.src = imgUrl;
+                    el.style.maxWidth = 400;
+                    el.style.maxHeight = 200;
+
+                    newMessage += el.outerHTML + "</img>";
+                    el.remove();
+
+                    continue;
+                }else if(data.message[i] == "]" && openURL && config.allowLinks) {
+                    openURL = false;
+
+                    var el = document.createElement("a");
+
+                    el.href = url.split("||")[0];
+                    el.innerText = url.split("||")[1];
+
+                    newMessage += el.outerHTML;
+                    el.remove();
+
+                    continue;
+                }
+
+                if(openImage && config.allowImages) {
+                    imgUrl += data.message[i];
+                    continue;
+                }else if(openURL && config.allowLinks) {
+                    url += data.message[i];
+                    continue;
+                }
+
+                newMessage += data.message[i];
+            }
+
+            addMessage({
+                "username": data.from,
+                "isAdmin": data.isAdmin,
+                "msg": newMessage
+            });
+        });
+
+        socket.on("emit old", (data) => {
+            data.forEach((val) => {
+                addMessage({
+                    "username": val.from,
+                    "isAdmin": val.isAdmin,
+                    "msg": val.message
+                });
+            });
+        });
+
+        socket.on("connect", async () => {
+            await loadConfig();
+
+            if(params.get("login") != null) {
+                socket.emit("verify admin", params.get("login"), (data) => {
+                    if(data == "OK") {
+                        addMessage({
+                            "username": "System-Bot",
+                            "isAdmin": true,
+                            "msg": "Logged in as admin."
+                        });
+                    }else {
+                        addMessage({
+                            "username": "System-Bot",
+                            "isAdmin": true,
+                            "msg": "Failed to login."
+                        });
+                    }
+                });
+            }
+
+            if(localStorage.getItem("usernameSaved") != null) {
+                socket.emit("set username", localStorage.getItem("usernameSaved"), (data) => {
+                    if(data == "OK") {
+                        ownUsername = localStorage.getItem("usernameSaved");
+                        localStorage.setItem("usernameSaved", ownUsername);
+
+                        addMessage({
+                            "username": "System-Bot",
+                            "isAdmin": true,
+                            "msg": "Your username was automatically set to " + localStorage.getItem("usernameSaved")
+                        });
+                    }else {
+                        addMessage({
+                            "username": "System-Bot",
+                            "isAdmin": true,
+                            "msg": errors["set username"][data]
+                        });
+                    }
+                });
+            }
+
+            addMessage({
+                "username": "System-Bot",
+                "isAdmin": true,
+                "msg": "<strong>System-Bot: </strong>Use <i>/username &lt;username&gt;</i> to set a username. It can only be " + config.maxUsernameLength + " characters long at most."
+            });
+        });
+
+        function loadConfig() {
+            return new Promise((resolve, reject) => {
+                socket.emit("get config", (data) => {
+                    config = data;
+                    document.getElementById("msginput").maxLength = config.maxMessageLength;
+
+                    resolve();
+                });
+            });
+        }
+
+        function addMessage(data) {
+            if(data.isAdmin) {
+                document.getElementById("messages").innerHTML += `<div class="message"><span style="color: red">[Admin] </span><strong>${data.username}</strong>: ${data.msg}</div>`;
+                document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+            }else {
+                document.getElementById("messages").innerHTML += `<div class="message"><strong>${data.username}</strong>: ${data.msg}</div>`;
+                document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+            }
+        }
+
+        // Title helper
+        var focused = true;
+        var titleToggle = false;
+        var newUnread = false;
+
+        window.onfocus = function() {
+            newUnread = false;
+            document.title = "Epic Chat";
+            focused = true;
+        };
+        window.onblur = function() {
+            focused = false;
+        };
+
+        setInterval(() => {
+            titleToggle = !titleToggle;
+
+            document.title = (newUnread ? (titleToggle ? "New Message" : "Epic Chat") : "Epic Chat");
+        }, 2500);
+
+        // Utility
+
+        function replacePlaceholders(msg, ...data) {
+            var result = msg;
+
+            for(var i = 0; i < data.length; i++) {
+                result = result.replace(new RegExp("/\{" + i + "\}/g"));
+            }
+
+            return result;
+        }
+    </script>
+
+    <div id="messages" style="height: calc(100vh - 40px); overflow: auto">
+    </div>
+    <div id="send" style="height: 40px;">
+        <input id="msginput" type="text" style="margin-left: 0px; height: 40px; font-size: 18px; width: calc(100vw - 70px); display: inline;" maxlength="2000"></input>
+        <button style="width: 60px; height: 40px; display: inline;" onclick="sendMessage();">Send</button>
+    </div>
+</body>

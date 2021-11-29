@@ -1,0 +1,10 @@
+{
+    "allowBold": true,
+    "allowImages": true,
+    "allowLinks": true,
+    "_allowLinks": "This will not block links, but will disable/enable highlighting of links when using [!LINK||TEXT] syntax",
+    "maxMessageLength": 2000,
+    "maxUsernameLength": 20,
+    "adminPassword": "CHANGE THIS PASSWORD!",
+    "port": 6060
+}
