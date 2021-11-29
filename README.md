@@ -7,3 +7,6 @@ now access the chat by going to http://localhost:6060 or if you have it running 
 
 # Configuration
 To configure EpicChat, open the `chatConfig.json` inside the `server/` folder. Inside of that file you can change the port, disable image embedding and more. If you need more customization, you can obviously just edit the source!
+
+# Where is the client?
+Well. I originally planned on a seperate client and server. A client that you can easily let run on a regular webserver. Yeah no, I just added the routes for the page on the server. The server hosts the client page.
