@@ -22,6 +22,27 @@
         .message:nth-child(2n) {
             background-color: #e9e9e9;
         }
+
+        .download {
+            background-color: rgb(56, 56, 56);
+            color: white;
+            width: 195px;
+            height: 40px;
+            display: inline-block;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            border-radius: 5px;
+            margin-left: 3px;
+            padding-left: 5px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .download p {
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -41,6 +62,10 @@
             "send message": {
                 "NO_USERNAME": "You don't have an username yet. Use <i>/username &lt;username&gt;</i> to set your username.",
                 "MSG_LEN": "Your message is either too short (<1 chars) or too long (>{0} chars)."
+            },
+            "send file": {
+                "FILE_NAME_TOO_LONG": "Your file name is too long. It can only be 127 characters long.",
+                "FILE_TOO_LARGE": "Your file is too large. This servers set a restriction of {0}kb."
             }
         }
 
@@ -291,6 +316,40 @@
             }
         }
 
+        function uploadPrompt() {
+            document.getElementById("file-input").click();
+        }
+
+        window.addEventListener("load", () => {
+            document.getElementById("file-input").addEventListener("change", async (ev) => {
+                /** @type {HTMLInputElement} */
+                var fileInput = document.getElementById("file-input");
+
+                if(fileInput.files[0].size > config.maxFileSizeKB*1024) {
+                    addMessage({
+                        "username": "System-Bot",
+                        "isAdmin": true,
+                        "msg": replacePlaceholders(errors["send file"]["FILE_TOO_LARGE"], config.maxFileSizeKB)
+                    });
+
+                    return;
+                }
+
+                socket.emit("send file", {
+                    "name": fileInput.files[0].name,
+                    "content": await fileInput.files[0].arrayBuffer()
+                }, (result) => {
+                    if(result != "OK") {
+                        addMessage({
+                            "username": "System-Bot",
+                            "isAdmin": true,
+                            "msg": replacePlaceholders(errors["send file"][result], config.maxFileSizeKB)
+                        });
+                    }
+                });
+            });
+        });
+
         // Title helper
         var focused = true;
         var titleToggle = false;
@@ -301,6 +360,7 @@
             document.title = "Epic Chat";
             focused = true;
         };
+
         window.onblur = function() {
             focused = false;
         };
@@ -314,10 +374,11 @@
         // Utility
 
         function replacePlaceholders(msg, ...data) {
+            /** @type {string} */
             var result = msg;
 
             for(var i = 0; i < data.length; i++) {
-                result = result.replace(new RegExp("/\{" + i + "\}/g"));
+                result = result.replace(new RegExp("\\{" + i + "\\}", "g"), data[i]);
             }
 
             return result;
@@ -327,7 +388,10 @@
     <div id="messages" style="height: calc(100vh - 40px); overflow: auto">
     </div>
     <div id="send" style="height: 40px;">
-        <input id="msginput" type="text" style="margin-left: 0px; height: 40px; font-size: 18px; width: calc(100vw - 70px); display: inline;" maxlength="2000"></input>
-        <button style="width: 60px; height: 40px; display: inline;" onclick="sendMessage();">Send</button>
+        <input id="msginput" type="text" style="margin-left: 0px; height: 40px; font-size: 18px; width: calc(100vw - 150px); display: inline;" maxlength="2000"></input>
+        <button style="width: 60px; height: 40px; display: inline;" onclick="sendMessage();">Send</button> or
+        <button style="width: 60px; height: 40px; display: inline;" onclick="uploadPrompt();">Upload</button>
     </div>
+
+    <input id="file-input" type="file" name="name" style="display: none;"/>
 </body>

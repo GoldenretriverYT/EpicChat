@@ -3,12 +3,38 @@ const http = require('http');
 const fs = require("fs");
 const { Server } = require("socket.io");
 
+var config = JSON.parse(fs.readFileSync("chatConfig.json"));
+
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    "pingTimeout": 120*1000,
+    "maxHttpBufferSize": (1024*1024) + (config.maxFileSizeKB*1024)
+});
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
+});
+
+app.get('/download', (req, res) => {
+    if(req.query.id == null) {
+        res.status(400).send("Bad request");
+        return;
+    }
+
+    if(uploads[req.query.id] == null) {
+        res.status(404).send("Not found");
+        return;
+    }
+
+    var fileContents = uploads[req.query.id].content;
+  
+    res.writeHead(200, {
+        'Content-Disposition': `attachment; filename="${uploads[req.query.id].name}"`,
+        'Content-Type': 'text/plain',
+    });
+
+    res.end(fileContents);
 });
 
 app.get('/socketio.js', (req, res) => {
@@ -20,7 +46,8 @@ var msgIdCounter = 0;
 
 var connectedUsers = [];
 var messages = [];
-var config = JSON.parse(fs.readFileSync("chatConfig.json"))
+
+var uploads = {};
 
 io.on('connection', (socket) => {
     socket.uniqueId = idCounter;
@@ -47,6 +74,7 @@ io.on('connection', (socket) => {
 
 
     socket.on("disconnect", (reason) => {
+        console.log(socket.uniqueId + " disconnect: " + reason);
         connectedUsers[socket.uniqueId].connected = false;
 
         io.emit("emit message", {
@@ -121,7 +149,8 @@ io.on('connection', (socket) => {
             "allowImages": config.allowImages,
             "allowLinks": config.allowLinks,
             "maxMessageLength": config.maxMessageLength,
-            "maxUsernameLength": config.maxUsernameLength
+            "maxUsernameLength": config.maxUsernameLength,
+            "maxFileSizeKB": config.maxFileSizeKB
         });
     });
 
@@ -158,9 +187,51 @@ io.on('connection', (socket) => {
         });
 
         ret("OK");
+    });
+
+    socket.on("send file", (data, ret) => {
+        if(data.name.length > 128) {
+            ret("FILE_NAME_TOO_LONG");
+        }
+
+        if(data.content.length > config.maxFileSizeKB*1024) {
+            ret("FILE_TOO_LARGE");
+        }
+
+        var id = idGen();
+
+        uploads[id] = {
+            "name": data.name,
+            "content": Buffer.from(data.content),
+            "from": connectedUsers[socket.uniqueId].username,
+            "fromId": socket.uniqueId 
+        }
+
+        io.emit("emit message", {
+            "from": connectedUsers[socket.uniqueId].username,
+            "isAdmin": connectedUsers[socket.uniqueId].isAdmin,
+            "message": `<div class="download" onclick="window.location.href = '/download?id=${id}';">
+                            <p style="font-size: 20px; margin-bottom: 0px; margin-top: 0px;">Download</p>
+                            <p style="font-size: 14px; margin-top: -5px; text-overflow: ellipsis; max-width: 180px;">${data.name}</p>
+                        </div>`
+        });
+
+        ret("OK");
     })
 });
 
 server.listen(config.port, () => {
     console.log(`EpicChat is now listening to port ${config.port}`);
 });
+
+var alp = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+function idGen(len = 32) {
+    var res = "";
+
+    for(var i = 0; i < len; i++) {
+        res += alp[Math.floor(Math.random() * alp.length)];
+    }
+
+    return res;
+}

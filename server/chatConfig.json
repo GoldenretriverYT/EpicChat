@@ -6,5 +6,6 @@
     "maxMessageLength": 2000,
     "maxUsernameLength": 20,
     "adminPassword": "CHANGE THIS PASSWORD!",
-    "port": 6060
+    "port": 6060,
+    "maxFileSizeKB": 16384 
 }
