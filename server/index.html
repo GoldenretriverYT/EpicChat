@@ -43,6 +43,29 @@
             text-overflow: ellipsis;
             overflow: hidden;
         }
+
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 120px;
+            top: 100%;
+            left: 50%;
+            margin-left: -60px;
+            background-color: black;
+            color: #fff;
+            text-align: center;
+            padding: 5px 0;
+            border-radius: 6px;
+            position: absolute;
+            z-index: 1;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+        }
     </style>
 </head>
 <body>
@@ -133,7 +156,7 @@
 
                     return;
                 }
-                
+
                 addMessage({
                     "username": "System-Bot",
                     "isAdmin": true,
@@ -325,6 +348,9 @@
             var openURL = false;
             var url = "";
 
+            var openEmoji = false;
+            var emoji = "";
+
             for(var i = 0; i < msg.length; i++) { // this is prob inefficient but i am too lazy to do regex stuff
                 if(msg[i] == "*" && config.allowBold) {
                     if(openStrong) {
@@ -348,6 +374,11 @@
                     i++;
 
                     continue;
+                }else if(msg[i] == ":" && !openEmoji) {
+                    openEmoji = true;
+                    emoji = "";
+
+                    continue;
                 }else if(msg[i] == "]" && openImage && config.allowImages) {
                     openImage = false;
 
@@ -358,6 +389,31 @@
                     el.style.maxHeight = 200;
 
                     newMessage += el.outerHTML + "</img>";
+                    el.remove();
+
+                    continue;
+                }else if(msg[i] == ":" && openEmoji) {
+                    openEmoji = false;
+
+                    var parentDiv = document.createElement("div");
+                    parentDiv.classList.add("tooltip");
+                    parentDiv.style.display = "inline-block";
+
+                    var el = document.createElement("img");
+
+                    el.src = "/emojis/" + emoji;
+                    el.style.maxWidth = 32;
+                    el.style.maxHeight = 32;
+
+                    parentDiv.appendChild(el);
+
+                    var span = document.createElement("span");
+                    span.innerText = emoji;
+                    span.classList.add("tooltiptext");
+
+                    parentDiv.appendChild(span);
+
+                    newMessage += parentDiv.outerHTML;
                     el.remove();
 
                     continue;
@@ -380,6 +436,10 @@
                     continue;
                 }else if(openURL && config.allowLinks) {
                     url += msg[i];
+                    continue;
+                }
+                else if(openEmoji) {
+                    emoji += msg[i];
                     continue;
                 }
 

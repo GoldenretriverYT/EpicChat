@@ -16,6 +16,10 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
+app.get('/emojis/:emoji', (req, res) => {
+    res.sendFile(__dirname + "/emojis/" + req.params.emoji + ".png");
+  });
+
 app.get('/download', (req, res) => {
     if(req.query.id == null) {
         res.status(400).send("Bad request");
