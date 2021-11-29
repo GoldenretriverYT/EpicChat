@@ -60,12 +60,6 @@ io.on('connection', (socket) => {
         "connected": true,
     });
 
-    socket.emit("emit old", messages.map((val) => { return {
-        "from": val.from,
-        "message": val.message,
-        "isAdmin": connectedUsers[val.fromId].isAdmin,
-    }}));
-
     io.emit("emit message", {
         "from": "System-Bot",
         "isAdmin": true,
@@ -152,6 +146,12 @@ io.on('connection', (socket) => {
             "maxUsernameLength": config.maxUsernameLength,
             "maxFileSizeKB": config.maxFileSizeKB
         });
+
+        socket.emit("emit old", messages.map((val) => { return {
+            "from": val.from,
+            "message": val.message,
+            "isAdmin": connectedUsers[val.fromId].isAdmin,
+        }}));
     });
 
     socket.on("send message", (data, ret) => {
@@ -207,6 +207,16 @@ io.on('connection', (socket) => {
             "fromId": socket.uniqueId 
         }
 
+        messages.push({
+            "id": msgIdCounter,
+            "from": connectedUsers[socket.uniqueId].username,
+            "fromId": socket.uniqueId,
+            "message": `<div class="download" onclick="window.location.href = '/download?id=${id}';">
+                            <p style="font-size: 20px; margin-bottom: 0px; margin-top: 0px;">Download</p>
+                            <p style="font-size: 14px; margin-top: -5px; text-overflow: ellipsis; max-width: 180px;">${data.name}</p>
+                        </div>`
+        });
+        
         io.emit("emit message", {
             "from": connectedUsers[socket.uniqueId].username,
             "isAdmin": connectedUsers[socket.uniqueId].isAdmin,

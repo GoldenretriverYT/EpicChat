@@ -7,5 +7,6 @@
     "maxUsernameLength": 20,
     "adminPassword": "CHANGE THIS PASSWORD!",
     "port": 6060,
-    "maxFileSizeKB": 16384 
+    "maxFileSizeKB": 16384,
+    "_maxFileSizeKB": "Please note that files are stored in RAM!" 
 }

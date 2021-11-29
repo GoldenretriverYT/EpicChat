@@ -158,76 +158,7 @@
         socket.on("emit message", (data) => {
             if(!focused) newUnread = true;
 
-            var newMessage = "";
-
-            var openStrong = false;
-
-            var openImage = false;
-            var imgUrl = "";
-
-            var openURL = false;
-            var url = "";
-
-            for(var i = 0; i < data.message.length; i++) { // this is prob inefficient but i am too lazy to do regex stuff
-                if(data.message[i] == "*" && config.allowBold) {
-                    if(openStrong) {
-                        openStrong = false;
-                        newMessage += "</strong>";
-                    }else {
-                        openStrong = true;
-                        newMessage += "<strong>";
-                    }
-
-                    continue;
-                }else if(data.message[i] == "[" && data.message.length > i && data.message[i+1] == "!" && !openImage && config.allowImages) {
-                    openImage = true;
-                    imgUrl = "";
-                    i++;
-
-                    continue;
-                }else if(data.message[i] == "[" && data.message.length > i && (data.message[i+1] == "~") && !openURL && config.allowLinks) {
-                    openURL = true;
-                    url = "";
-                    i++;
-
-                    continue;
-                }else if(data.message[i] == "]" && openImage && config.allowImages) {
-                    openImage = false;
-
-                    var el = document.createElement("img");
-
-                    el.src = imgUrl;
-                    el.style.maxWidth = 400;
-                    el.style.maxHeight = 200;
-
-                    newMessage += el.outerHTML + "</img>";
-                    el.remove();
-
-                    continue;
-                }else if(data.message[i] == "]" && openURL && config.allowLinks) {
-                    openURL = false;
-
-                    var el = document.createElement("a");
-
-                    el.href = url.split("||")[0];
-                    el.innerText = url.split("||")[1];
-
-                    newMessage += el.outerHTML;
-                    el.remove();
-
-                    continue;
-                }
-
-                if(openImage && config.allowImages) {
-                    imgUrl += data.message[i];
-                    continue;
-                }else if(openURL && config.allowLinks) {
-                    url += data.message[i];
-                    continue;
-                }
-
-                newMessage += data.message[i];
-            }
+            var newMessage = formatText(data.message);
 
             addMessage({
                 "username": data.from,
@@ -241,7 +172,7 @@
                 addMessage({
                     "username": val.from,
                     "isAdmin": val.isAdmin,
-                    "msg": val.message
+                    "msg": formatText(val.message)
                 });
             });
         });
@@ -382,6 +313,80 @@
             }
 
             return result;
+        }
+
+        function formatText(msg) {
+            var newMessage = "";
+            var openStrong = false;
+
+            var openImage = false;
+            var imgUrl = "";
+
+            var openURL = false;
+            var url = "";
+
+            for(var i = 0; i < msg.length; i++) { // this is prob inefficient but i am too lazy to do regex stuff
+                if(msg[i] == "*" && config.allowBold) {
+                    if(openStrong) {
+                        openStrong = false;
+                        newMessage += "</strong>";
+                    }else {
+                        openStrong = true;
+                        newMessage += "<strong>";
+                    }
+
+                    continue;
+                }else if(msg[i] == "[" && msg.length > i && msg[i+1] == "!" && !openImage && config.allowImages) {
+                    openImage = true;
+                    imgUrl = "";
+                    i++;
+
+                    continue;
+                }else if(msg[i] == "[" && msg.length > i && (msg[i+1] == "~") && !openURL && config.allowLinks) {
+                    openURL = true;
+                    url = "";
+                    i++;
+
+                    continue;
+                }else if(msg[i] == "]" && openImage && config.allowImages) {
+                    openImage = false;
+
+                    var el = document.createElement("img");
+
+                    el.src = imgUrl;
+                    el.style.maxWidth = 400;
+                    el.style.maxHeight = 200;
+
+                    newMessage += el.outerHTML + "</img>";
+                    el.remove();
+
+                    continue;
+                }else if(msg[i] == "]" && openURL && config.allowLinks) {
+                    openURL = false;
+
+                    var el = document.createElement("a");
+
+                    el.href = url.split("||")[0];
+                    el.innerText = url.split("||")[1];
+
+                    newMessage += el.outerHTML;
+                    el.remove();
+
+                    continue;
+                }
+
+                if(openImage && config.allowImages) {
+                    imgUrl += msg[i];
+                    continue;
+                }else if(openURL && config.allowLinks) {
+                    url += msg[i];
+                    continue;
+                }
+
+                newMessage += msg[i];
+            }
+
+            return newMessage;
         }
     </script>
 
