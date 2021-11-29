@@ -191,12 +191,13 @@
         });
 
         socket.on("emit old", (data) => {
+            console.log(data);
             data.forEach((val) => {
                 addMessage({
                     "username": val.from,
                     "isAdmin": val.isAdmin,
-                    "msg": formatText(val.message)
-                });
+                    "msg": formatText(val.message),
+                }, val.time);
             });
         });
 
@@ -260,12 +261,14 @@
             });
         }
 
-        function addMessage(data) {
+        function addMessage(data, time = Date.now()) {
+            var clock = new Date(time).getHours().toLocaleString("en", {minimumIntegerDigits: 2}) + ":" + new Date(time).getMinutes().toLocaleString("en", {minimumIntegerDigits: 2}) + ":" + new Date(time).getSeconds().toLocaleString("en", {minimumIntegerDigits: 2});
+
             if(data.isAdmin) {
-                document.getElementById("messages").innerHTML += `<div class="message"><span style="color: red">[Admin] </span><strong>${data.username}</strong>: ${data.msg}</div>`;
+                document.getElementById("messages").innerHTML += `<div class="message"><span style="color: gray; font-size: 12px;">${clock} </span><span style="color: red">[Admin] </span><strong>${data.username}</strong>: ${data.msg}</div>`;
                 document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
             }else {
-                document.getElementById("messages").innerHTML += `<div class="message"><strong>${data.username}</strong>: ${data.msg}</div>`;
+                document.getElementById("messages").innerHTML += `<div class="message"><span style="color: gray; font-size: 12px;">${clock} </span><strong>${data.username}</strong>: ${data.msg}</div>`;
                 document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
             }
         }

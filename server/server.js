@@ -155,6 +155,7 @@ io.on('connection', (socket) => {
             "from": val.from,
             "message": val.message,
             "isAdmin": connectedUsers[val.fromId].isAdmin,
+            "time": val.time
         }}));
     });
 
@@ -181,7 +182,8 @@ io.on('connection', (socket) => {
             "id": msgIdCounter,
             "from": connectedUsers[socket.uniqueId].username,
             "fromId": socket.uniqueId,
-            "message": sanitized
+            "message": sanitized,
+            "time": Date.now()
         });
 
         io.emit("emit message", {
@@ -208,7 +210,8 @@ io.on('connection', (socket) => {
             "name": data.name,
             "content": Buffer.from(data.content),
             "from": connectedUsers[socket.uniqueId].username,
-            "fromId": socket.uniqueId 
+            "fromId": socket.uniqueId,
+            "time": Date.now()
         }
 
         messages.push({
