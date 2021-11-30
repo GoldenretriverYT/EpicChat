@@ -3,7 +3,7 @@ const http = require('http');
 const fs = require("fs");
 const { Server } = require("socket.io");
 
-var config = JSON.parse(fs.readFileSync("chatConfig.json"));
+var config = require("./chatConfig.json");
 
 const app = express();
 const server = http.createServer(app);
