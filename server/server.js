@@ -65,6 +65,7 @@ io.on('connection', (socket) => {
     });
 
     io.emit("emit message", {
+        "mid": systemBotId(),
         "from": "System-Bot",
         "isAdmin": true,
         "message": "A new user connected! (ID: " + socket.uniqueId + ")"
@@ -76,6 +77,7 @@ io.on('connection', (socket) => {
         connectedUsers[socket.uniqueId].connected = false;
 
         io.emit("emit message", {
+            "mid": systemBotId(),
             "from": "System-Bot",
             "isAdmin": true,
             "message": "User ID " + socket.uniqueId + " has disconnected :("
@@ -103,6 +105,7 @@ io.on('connection', (socket) => {
             }
 
             io.emit("emit message", {
+                "mid": systemBotId(),
                 "from": "System-Bot",
                 "isAdmin": true,
                 "message": (connectedUsers[socket.uniqueId].username == "Pending" ? "User with ID " + socket.uniqueId : connectedUsers[socket.uniqueId].username) + " changed his name to " + data.replace(/<\/?[^>]+(>|$)/g, "")
@@ -119,6 +122,7 @@ io.on('connection', (socket) => {
     socket.on("verify admin", (data, ret) => {
         if(data == config.adminPassword) {
             io.emit("emit message", {
+                "mid": systemBotId(),
                 "from": "System-Bot",
                 "isAdmin": true,
                 "message": (connectedUsers[socket.uniqueId].username == "Pending" ? "User with ID " + socket.uniqueId : connectedUsers[socket.uniqueId].username) + " is now logged in as an admin."
@@ -151,7 +155,8 @@ io.on('connection', (socket) => {
             "maxFileSizeKB": config.maxFileSizeKB
         });
 
-        socket.emit("emit old", messages.map((val) => { return {
+        socket.emit("emit old", messages.map((val, index) => { return {
+            "mid": index,
             "from": val.from,
             "message": val.message,
             "isAdmin": connectedUsers[val.fromId].isAdmin,
@@ -179,7 +184,7 @@ io.on('connection', (socket) => {
         }
 
         messages.push({
-            "id": msgIdCounter,
+            "mid": msgIdCounter,
             "from": connectedUsers[socket.uniqueId].username,
             "fromId": socket.uniqueId,
             "message": sanitized,
@@ -187,6 +192,7 @@ io.on('connection', (socket) => {
         });
 
         io.emit("emit message", {
+            "mid": msgIdCounter,
             "from": connectedUsers[socket.uniqueId].username,
             "isAdmin": connectedUsers[socket.uniqueId].isAdmin,
             "message": sanitized
@@ -216,8 +222,10 @@ io.on('connection', (socket) => {
             "size": buf.byteLength
         }
 
+        msgIdCounter++;
+
         messages.push({
-            "id": msgIdCounter,
+            "mid": msgIdCounter,
             "from": connectedUsers[socket.uniqueId].username,
             "fromId": socket.uniqueId,
             "message": `<div class="download" onclick="window.location.href = '/download?id=${id}';">
@@ -227,6 +235,7 @@ io.on('connection', (socket) => {
         });
         
         io.emit("emit message", {
+            "mid": msgIdCounter,
             "from": connectedUsers[socket.uniqueId].username,
             "isAdmin": connectedUsers[socket.uniqueId].isAdmin,
             "message": `<div class="download" onclick="window.location.href = '/download?id=${id}';">
@@ -253,4 +262,8 @@ function idGen(len = 32) {
     }
 
     return res;
+}
+
+function systemBotId() {
+    return 1000000 + Math.floor(Math.random()*500000);
 }
