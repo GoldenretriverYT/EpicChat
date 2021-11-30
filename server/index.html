@@ -354,36 +354,50 @@
             var openEmoji = false;
             var emoji = "";
 
+            var anyOpen = false;
+
             for(var i = 0; i < msg.length; i++) { // this is prob inefficient but i am too lazy to do regex stuff
                 if(msg[i] == "*" && config.allowBold) {
                     if(openStrong) {
                         openStrong = false;
+                        anyOpen = false;
+
                         newMessage += "</strong>";
-                    }else {
+                    }else if(!anyOpen) {
+                        anyOpen = true;
                         openStrong = true;
+
                         newMessage += "<strong>";
                     }
 
                     continue;
-                }else if(msg[i] == "[" && msg.length > i && msg[i+1] == "!" && !openImage && config.allowImages) {
+                }else if(msg[i] == "[" && msg.length > i && msg[i+1] == "!" && !openImage && config.allowImages && !anyOpen) {
                     openImage = true;
+                    anyOpen = true;
+
                     imgUrl = "";
                     i++;
 
                     continue;
-                }else if(msg[i] == "[" && msg.length > i && (msg[i+1] == "~") && !openURL && config.allowLinks) {
+                }else if(msg[i] == "[" && msg.length > i && (msg[i+1] == "~") && !openURL && config.allowLinks && !anyOpen) {
                     openURL = true;
+                    anyOpen = true;
+
                     url = "";
                     i++;
 
                     continue;
-                }else if(msg[i] == ":" && !openEmoji && false) {
+                }else if(msg[i] == ":" && !openEmoji && !anyOpen && !msg.substr(0, i).endsWith("http") && false /* temp disabled, use [!/emojis/EMOJI_NAME] instead*/) {
                     openEmoji = true;
+                    console.log(msg.substr(0, msg[i]));
+                    anyOpen = true;
+
                     emoji = "";
 
                     continue;
                 }else if(msg[i] == "]" && openImage && config.allowImages) {
                     openImage = false;
+                    anyOpen = false;
 
                     var el = document.createElement("img");
 
@@ -395,8 +409,9 @@
                     el.remove();
 
                     continue;
-                }else if(msg[i] == ":" && openEmoji && false /* emojis temporarily disabled due to bug*/) {
+                }else if(msg[i] == ":" && openEmoji  && false /* temp disabled, use [!/emojis/EMOJI_NAME] instead*/) {
                     openEmoji = false;
+                    anyOpen = false;
 
                     var parentDiv = document.createElement("div");
                     parentDiv.classList.add("tooltip");
@@ -422,6 +437,7 @@
                     continue;
                 }else if(msg[i] == "]" && openURL && config.allowLinks) {
                     openURL = false;
+                    anyOpen = false;
 
                     var el = document.createElement("a");
 

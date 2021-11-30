@@ -205,13 +205,15 @@ io.on('connection', (socket) => {
         }
 
         var id = idGen();
+        var buf = Buffer.from(data.content);
 
         uploads[id] = {
             "name": data.name,
-            "content": Buffer.from(data.content),
+            "content": buf,
             "from": connectedUsers[socket.uniqueId].username,
             "fromId": socket.uniqueId,
-            "time": Date.now()
+            "time": Date.now(),
+            "size": buf.byteLength
         }
 
         messages.push({
@@ -219,7 +221,7 @@ io.on('connection', (socket) => {
             "from": connectedUsers[socket.uniqueId].username,
             "fromId": socket.uniqueId,
             "message": `<div class="download" onclick="window.location.href = '/download?id=${id}';">
-                            <p style="font-size: 20px; margin-bottom: 0px; margin-top: 0px;">Download</p>
+                            <p style="font-size: 20px; margin-bottom: 0px; margin-top: 0px;">Download (${Math.floor(uploads[id].size/1024)}kb)</p>
                             <p style="font-size: 14px; margin-top: -5px; text-overflow: ellipsis; max-width: 180px;">${data.name}</p>
                         </div>`
         });
@@ -228,7 +230,7 @@ io.on('connection', (socket) => {
             "from": connectedUsers[socket.uniqueId].username,
             "isAdmin": connectedUsers[socket.uniqueId].isAdmin,
             "message": `<div class="download" onclick="window.location.href = '/download?id=${id}';">
-                            <p style="font-size: 20px; margin-bottom: 0px; margin-top: 0px;">Download</p>
+                            <p style="font-size: 20px; margin-bottom: 0px; margin-top: 0px;">Download (${Math.floor(uploads[id].size/1024)}kb)</p>
                             <p style="font-size: 14px; margin-top: -5px; text-overflow: ellipsis; max-width: 180px;">${data.name}</p>
                         </div>`
         });
