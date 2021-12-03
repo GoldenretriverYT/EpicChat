@@ -74,7 +74,8 @@
         var ownUsername = "Pending";
         var config = {};
 
-        var msgs = {};
+        var messages = {};
+        var users = {};
 
         const params = new URLSearchParams(window.location.search);
 
@@ -206,6 +207,10 @@
                 }, val.time);
             });
         });
+
+        socket.on("update users", (data) => {
+            users = data;
+        })
 
         socket.on("connect", async () => {
             await loadConfig();
@@ -353,6 +358,16 @@
 
             document.title = (newUnread ? (titleToggle ? "New Message" : "Epic Chat") : "Epic Chat");
         }, 2500);
+
+        setInterval(() => {
+            reloadUsers();
+        }, 5000);
+
+        function reloadUsers() {
+            socket.emit("get online", null, (data) => {
+                users = data;
+            });
+        }
 
         // Utility
 

@@ -5,6 +5,7 @@ const { Server } = require("socket.io");
 
 var config = require("./chatConfig.json");
 
+/* Setting up web server & socket.io */
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -16,10 +17,12 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
+/* As you might've guessed, the emoji route */
 app.get('/emojis/:emoji', (req, res) => {
     res.sendFile(__dirname + "/emojis/" + req.params.emoji + ".png");
-  });
+});
 
+/* Download a file with the given id */
 app.get('/download', (req, res) => {
     if(req.query.id == null) {
         res.status(400).send("Bad request");
@@ -33,77 +36,74 @@ app.get('/download', (req, res) => {
 
     var fileContents = uploads[req.query.id].content;
   
-    res.writeHead(200, {
+    res.writeHead(200, { /* Set headers for file download */
         'Content-Disposition': `attachment; filename="${uploads[req.query.id].name}"`,
         'Content-Type': 'text/plain',
     });
 
-    res.end(fileContents);
+    res.end(fileContents); /* Send file contents */
 });
 
-app.get('/socketio.js', (req, res) => {
+app.get('/socketio.js', (req, res) => { /* Provide socket.io client library */
     res.sendFile(__dirname + '/socketio.js');
 });
 
-var idCounter = 0;
-var msgIdCounter = 0;
+var connectedUsers = {}; // Object of connected user objects
+var messages = {}; // Object of messages
 
-var connectedUsers = [];
-var messages = [];
-
-var uploads = {};
+var uploads = {}; // Object including all uploaded files
 
 io.on('connection', (socket) => {
-    socket.uniqueId = idCounter;
-    idCounter++;
+    socket.uniqueId = idGenNum();
 
-    connectedUsers.push({
+    connectedUsers[socket.uniqueId] = { /* Add the user with username pending */
         "username": "Pending",
         "id": socket.uniqueId,
         "isAdmin": false,
         "connected": true,
-    });
+    };
 
-    io.emit("emit message", {
+    io.emit("emit message", { /* Notify all clients that a new user is here! */
         "mid": systemBotId(),
         "from": "System-Bot",
         "isAdmin": true,
         "message": "A new user connected! (ID: " + socket.uniqueId + ")"
     });
 
+    io.emit("update users", Object.values(connectedUsers).filter((val) => val.connected));
 
     socket.on("disconnect", (reason) => {
         console.log(socket.uniqueId + " disconnect: " + reason);
-        connectedUsers[socket.uniqueId].connected = false;
+        connectedUsers[socket.uniqueId].connected = false; /* Set the connected value to false */
 
-        io.emit("emit message", {
+        io.emit("emit message", { /* Notify all clients that this user disconnected */
             "mid": systemBotId(),
             "from": "System-Bot",
             "isAdmin": true,
-            "message": "User ID " + socket.uniqueId + " has disconnected :("
+            "message": "User ID " + socket.uniqueId + (connectedUsers[socket.uniqueId].username == "Pending" ? "" : " (" +connectedUsers[socket.uniqueId].username + ") ") + "has disconnected :("
         });
+
+        io.emit("update users", Object.values(connectedUsers).filter((val) => val.connected));
     });
 
-    socket.on("set username", (data, ret) => {
-        if(typeof(data) == "string") {
-            if(data.length > config.maxUsernameLength) {
+    socket.on("set username", (data, ret) => { // Received when user does /username
+        if(typeof(data) == "string") { // Check if the data is even a string
+            if(data.length > config.maxUsernameLength) { // Check the length
                 ret("TOO_LONG");
                 return;
             }
 
-            var nameTook = false;
-
-            connectedUsers.forEach((user) => {
+            /* Check if the name is already taken */
+            Object.values(connectedUsers).forEach((user) => {
                 if(user.connected) {
-                    if(user.username == data) nameTook = true;
+                    if(user.username == data) {
+                        ret("NAME_TOOK");
+                        return;
+                    }
                 }
             });
 
-            if(nameTook) {
-                ret("NAME_TOOK");
-                return;
-            }
-
+            /* Notify all clients that the user changed his name */
             io.emit("emit message", {
                 "mid": systemBotId(),
                 "from": "System-Bot",
@@ -111,7 +111,8 @@ io.on('connection', (socket) => {
                 "message": (connectedUsers[socket.uniqueId].username == "Pending" ? "User with ID " + socket.uniqueId : connectedUsers[socket.uniqueId].username) + " changed his name to " + data.replace(/<\/?[^>]+(>|$)/g, "")
             });
 
-            connectedUsers[socket.uniqueId].username = data.replace(/<\/?[^>]+(>|$)/g, "");
+            /* Actually apply the change */
+            connectedUsers[socket.uniqueId].username = data.replace(/<\/?[^>]+(>|$)/g, ""); // Remove HTML tags
 
             ret("OK");
         }else {
@@ -119,16 +120,16 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on("verify admin", (data, ret) => {
+    socket.on("verify admin", (data, ret) => { // login code
         if(data == config.adminPassword) {
-            io.emit("emit message", {
+            io.emit("emit message", { // Notify all clients that an user is now an admin
                 "mid": systemBotId(),
                 "from": "System-Bot",
                 "isAdmin": true,
                 "message": (connectedUsers[socket.uniqueId].username == "Pending" ? "User with ID " + socket.uniqueId : connectedUsers[socket.uniqueId].username) + " is now logged in as an admin."
             });
 
-            connectedUsers[socket.uniqueId].isAdmin = true;
+            connectedUsers[socket.uniqueId].isAdmin = true; // Set the admin status
             ret("OK");
             return;
         }
@@ -137,15 +138,10 @@ io.on('connection', (socket) => {
     })
 
     socket.on("get online", (data, ret) => {
-        ret(connectedUsers.filter((val) => val.connected).map((val) => {
-            return {
-                "username": val.username,
-                "isAdmin": val.isAdmin,
-            }
-        }));
+        ret(Object.values(connectedUsers).filter((val) => val.connected)); // Get a list of users that still are connected
     });
 
-    socket.on("get config", (ret) => {
+    socket.on("get config", async (ret) => { // Returns a trimmed version of the config
         ret({
             "allowBold": config.allowBold,
             "allowImages": config.allowImages,
@@ -155,8 +151,10 @@ io.on('connection', (socket) => {
             "maxFileSizeKB": config.maxFileSizeKB
         });
 
-        socket.emit("emit old", messages.map((val, index) => { return {
-            "mid": index,
+        await socket.emit("update users", Object.values(connectedUsers).filter((val) => val.connected)); // Send users
+
+        socket.emit("emit old", Object.values(messages).map((val, index) => { return { // After user has requested the config, send him the old messages. This is becuase
+            "mid": val.mid,                                                            // the client can't handle old messages before that.
             "from": val.from,
             "message": val.message,
             "isAdmin": connectedUsers[val.fromId].isAdmin,
@@ -165,54 +163,51 @@ io.on('connection', (socket) => {
     });
 
     socket.on("send message", (data, ret) => {
-        if(connectedUsers[socket.uniqueId].username == "Pending") {
+        if(connectedUsers[socket.uniqueId].username == "Pending") { // Check if user has already done /username
             ret("NO_USERNAME");
             return;
         }
 
-        if(data.length < 1 || data.length > config.maxMessageLength) {
+        if(data.length < 1 || data.length > config.maxMessageLength) { // Check message length
             ret("MSG_LEN");
             return;
         }
 
-        msgIdCounter++;
-
+        // Remove HTML tags from message
         var sanitized = data;
         
         if(!connectedUsers[socket.uniqueId].isAdmin) {
             sanitized = data.replace(/<\/?[^>]+(>|$)/g, "");
         }
 
-        messages.push({
-            "mid": msgIdCounter,
+        var message = {
+            "mid": idGenNum(),
             "from": connectedUsers[socket.uniqueId].username,
             "fromId": socket.uniqueId,
             "message": sanitized,
             "time": Date.now()
-        });
+        };
 
-        io.emit("emit message", {
-            "mid": msgIdCounter,
-            "from": connectedUsers[socket.uniqueId].username,
-            "isAdmin": connectedUsers[socket.uniqueId].isAdmin,
-            "message": sanitized
-        });
+        // Add it to the message history & send it
+        messages[message.mid] = message;
+        io.emit("emit message", message);
 
         ret("OK");
     });
 
     socket.on("send file", (data, ret) => {
-        if(data.name.length > 128) {
+        if(data.name.length > 128) { // Check if the file name exceeds 128 characters
             ret("FILE_NAME_TOO_LONG");
         }
 
-        if(data.content.length > config.maxFileSizeKB*1024) {
+        if(data.content.length > config.maxFileSizeKB*1024) { // Check the file size
             ret("FILE_TOO_LARGE");
         }
 
-        var id = idGen();
-        var buf = Buffer.from(data.content);
+        var id = idGen(); // Generate an id
+        var buf = Buffer.from(data.content); // Generate a buffer from the data sent
 
+        // Add the upload to the uploads object
         uploads[id] = {
             "name": data.name,
             "content": buf,
@@ -222,27 +217,19 @@ io.on('connection', (socket) => {
             "size": buf.byteLength
         }
 
-        msgIdCounter++;
-
-        messages.push({
-            "mid": msgIdCounter,
+        // Also send a message
+        var message = {
+            "mid": idGenNum(),
             "from": connectedUsers[socket.uniqueId].username,
             "fromId": socket.uniqueId,
             "message": `<div class="download" onclick="window.location.href = '/download?id=${id}';">
                             <p style="font-size: 20px; margin-bottom: 0px; margin-top: 0px;">Download (${Math.floor(uploads[id].size/1024)}kb)</p>
                             <p style="font-size: 14px; margin-top: -5px; text-overflow: ellipsis; max-width: 180px;">${data.name}</p>
                         </div>`
-        });
-        
-        io.emit("emit message", {
-            "mid": msgIdCounter,
-            "from": connectedUsers[socket.uniqueId].username,
-            "isAdmin": connectedUsers[socket.uniqueId].isAdmin,
-            "message": `<div class="download" onclick="window.location.href = '/download?id=${id}';">
-                            <p style="font-size: 20px; margin-bottom: 0px; margin-top: 0px;">Download (${Math.floor(uploads[id].size/1024)}kb)</p>
-                            <p style="font-size: 14px; margin-top: -5px; text-overflow: ellipsis; max-width: 180px;">${data.name}</p>
-                        </div>`
-        });
+        }
+
+        messages[message.mid] = message;
+        io.emit("emit message", message);
 
         ret("OK");
     })
@@ -255,6 +242,17 @@ server.listen(config.port, () => {
 var alp = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 function idGen(len = 32) {
+    var res = "";
+
+    for(var i = 0; i < len; i++) {
+        res += alp[Math.floor(Math.random() * alp.length)];
+    }
+
+    return res;
+}
+
+var nums = "0123456789";
+function idGenNum(len = 8) {
     var res = "";
 
     for(var i = 0; i < len; i++) {
