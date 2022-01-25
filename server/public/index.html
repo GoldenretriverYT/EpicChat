@@ -71,35 +71,15 @@
 <body>
     <script>
         var socket = io();
-        var ownUsername = "Pending";
         var config = {};
-
-        var messages = {};
-        var users = {};
 
         const params = new URLSearchParams(window.location.search);
 
-        var errors = {
-            "set username": {
-                "TOO_LONG": "Username too long - your username can only be {0} characters long",
-                "ERROR": "An unknown error occurred.",
-                "NAME_TOOK": "This name is already in use."
-            },
-            "send message": {
-                "NO_USERNAME": "You don't have an username yet. Use <i>/username &lt;username&gt;</i> to set your username.",
-                "MSG_LEN": "Your message is either too short (<1 chars) or too long (>{0} chars)."
-            },
-            "send file": {
-                "FILE_NAME_TOO_LONG": "Your file name is too long. It can only be 127 characters long.",
-                "FILE_TOO_LARGE": "Your file is too large. This servers set a restriction of {0}kb."
-            }
-        }
-
-        window.addEventListener("keypress", (ev) => {
+        /*window.addEventListener("keypress", (ev) => {
             if(ev.key == "Enter") {
                 sendMessage();
             }
-        });
+        });*/
 
         socket.on("connect", async () => {
             await loadConfig();

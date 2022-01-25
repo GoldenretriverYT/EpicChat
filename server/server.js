@@ -8,47 +8,48 @@ var config = require("./chatConfig.json");
 
 /*
   Users Struct:
-    [
+    {
         userId: {
             "username": "<username>",
             "passwordHash": "<bcrypt password hash>",
             "role": "<roleId>",
             "authToken": "",
         }
-    ]
+    }
 */
+if(!fs.existsSync("users.json")) fs.writeFileSync("users.json", "{}");
 var users = JSON.parse(fs.readFileSync("users.json"));
 
 /*
   Roles Struct:
-    [
+    {
         roleId: {
             "roleName": "<role name>",
             "roleColor": "<hex color>",
             "permissions": ["write", "ban"]
         }
-    ]
-*/
-var roles = JSON.parse(fs.readFileSync("roles.json"));
-
-if(!"0" in roles) {
-    roles["0"] = {
-        "roleName": "everyone",
-        "roleColor": "#000000",
-        "permissions": ["write"]
     }
-}
+*/
+if(!fs.existsSync("roles.json")) fs.writeFileSync("roles.json", `[{
+    "roleId": "0",
+    "roleName": "everyone",
+    "roleColor": "#000000",
+    "permissions": ["write"]
+}]`);
+var roles = JSON.parse(fs.readFileSync("roles.json"));
 
 /*
     Messages Struct:
     [
-        messageId: {
+        {
+            "messageId": 0,
             "writtenBy": "<userId>",
             "content": "<content>",
             "writtenAt": "<timestamp>",
         }
     ]
 */
+if(!fs.existsSync("messages.json")) fs.writeFileSync("messages.json", "[]");
 var messages = JSON.parse(fs.readFileSync("messages.json"));
 
 /* Setting up web server & socket.io */
@@ -59,13 +60,7 @@ const io = new Server(server, {
     "maxHttpBufferSize": (1024*1024) + (config.maxFileSizeKB*1024)
 });
 
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
-
-app.get('/socketio.js', (req, res) => { /* Provide socket.io client library */
-    res.sendFile(__dirname + '/socketio.js');
-});
+app.use('/', express.static('public'));
 
 io.on('connection', (socket) => {
     socket.uniqueId = generateUID();
@@ -106,12 +101,12 @@ io.on('connection', (socket) => {
         }
 
         bcrypt.hash(data.password).then((hash) => {
-            users[generateUID()] = {
+            users[generateUID(16)] = ({
                 "username": data.username,
                 "passwordHash": hash,
                 "role": "0",
                 "authToken": "NOT_LOGGED_IN",
-            }
+            });
 
             answer({success: 1, data: "You can now log in."});
         });

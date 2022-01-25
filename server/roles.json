@@ -1,0 +1,6 @@
+[{
+    "roleId": "0",
+    "roleName": "everyone",
+    "roleColor": "#000000",
+    "permissions": ["write"]
+}]
