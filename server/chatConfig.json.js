@@ -3,7 +3,7 @@ module.exports = {
         "type": "mysql", // Currently only MySQL servers are supported for data storage.
         "host": "127.0.0.1",
         "user": "root",
-        "pass": "example - please change"
+        "pass": "Example123"
     },
     "maxMessageLength": 2000, // How long can the message be?
     "port": 6060, // The port the server should run on
