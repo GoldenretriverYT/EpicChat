@@ -51,7 +51,7 @@
 
     if(rows.length < 1) {
         console.log("No default role, creating it.");
-        await connection.query("INSERT INTO roles (name, color, permissionWrite, permissionDeleteOther, permissionBan) VALUES ('everyone', '#000000', 1, 0, 0)").catch((err) => {
+        await connection.query("INSERT INTO roles (name, color, permissionWrite, permissionDeleteOther, permissionBan, permissionManageRoles) VALUES ('everyone', '#000000', 1, 0, 0, 0)").catch((err) => {
             exitErr("Failed to create default role: " + err);
         });
     }
