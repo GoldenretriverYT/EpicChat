@@ -101,117 +101,6 @@
             }
         });
 
-        function sendMessage() {
-            console.log("Sending message...");
-            var msg = document.getElementById("msginput").value;
-            document.getElementById("msginput").value = "";
-
-            if(msg.startsWith("/")) {
-                var args = msg.split(" ");
-
-                if(args[0] == "/username") {
-                    socket.emit("set username", args[1], (data) => {
-                        if(data == "OK") {
-                            ownUsername = args[1];
-                            localStorage.setItem("usernameSaved", ownUsername);
-
-                            addMessage({
-                                "username": "System-Bot",
-                                "isAdmin": true,
-                                "msg": "Your username was changed to " + args[1]
-                            });
-                        }else {
-                            addMessage({
-                                "username": "System-Bot",
-                                "isAdmin": true,
-                                "msg": replacePlaceholders(errors["set username"][data], config.maxUsernameLength)
-                            });
-                        }
-                    });
-
-                    return;
-                }else if(args[0] == "/login") {
-                    addMessage({
-                        "username": "System-Bot",
-                        "isAdmin": true,
-                        "msg": "To prevent accidental sending, this command was disabled."
-                    });
-
-                    return;
-                }else if(args[0] == "/online") {
-                    socket.emit("get online", null, (data) => {
-                        var userStrings = [];
-
-                        data.forEach((user) => {
-                            if(user.isAdmin) {
-                                userStrings.push(`<span style="color: red">[Admin] </span><strong>${user.username}</strong>`);
-                            }else {
-                                userStrings.push(`<strong>${user.username}</strong>`);
-                            }
-                        });
-
-                        addMessage({
-                            "username": "System-Bot",
-                            "isAdmin": true,
-                            "msg": "Users online (" + userStrings.length + "): " + userStrings.join(", ")
-                        });
-                    });
-
-                    return;
-                }
-
-                addMessage({
-                    "username": "System-Bot",
-                    "isAdmin": true,
-                    "msg": "Invalid command."
-                });
-
-                return;
-            }
-
-            socket.emit("send message", msg, (res) => {
-                if(res == "OK") {
-                    console.log("message was sent");
-                }else {
-                    addMessage({
-                        "username": "System-Bot",
-                        "msg": replacePlaceholders(errors["send message"][res], config.maxMessageLength)
-                    });
-                }
-            });
-        }
-
-        socket.on("emit message", (data) => {
-            if(!focused) newUnread = true;
-
-            var newMessage = formatText(data.message);
-
-            addMessage({
-                "mid": data.mid,
-                "username": data.from,
-                "isAdmin": data.isAdmin,
-                "msg": newMessage,
-                "time": data.time
-            });
-        });
-
-        socket.on("emit old", (data) => {
-            console.log(data);
-            data.forEach((val) => {
-                addMessage({
-                    "mid": val.mid,
-                    "username": val.from,
-                    "isAdmin": val.isAdmin,
-                    "msg": formatText(val.message),
-                    "time": val.time,
-                }, val.time);
-            });
-        });
-
-        socket.on("update users", (data) => {
-            users = data;
-        })
-
         socket.on("connect", async () => {
             await loadConfig();
 
@@ -233,7 +122,7 @@
                 });
             }
 
-            if(localStorage.getItem("usernameSaved") != null) {
+            if(localStorage.getItem("authToken") != null) {
                 socket.emit("set username", localStorage.getItem("usernameSaved"), (data) => {
                     if(data == "OK") {
                         ownUsername = localStorage.getItem("usernameSaved");
