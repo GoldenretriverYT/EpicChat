@@ -37,7 +37,7 @@
         exitErr("Failed to create table messages: " + err);
     });
 
-    await connection.query('CREATE TABLE IF NOT EXISTS `users` ( `userId` int NOT NULL AUTO_INCREMENT, `username` text, `passwordHash` text, `assignedRole` int DEFAULT NULL, PRIMARY KEY (`userId`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci').catch((err) => {
+    await connection.query('CREATE TABLE IF NOT EXISTS `users` ( `userId` int NOT NULL AUTO_INCREMENT, `username` text, `passwordHash` text, `assignedRole` int DEFAULT NULL, `authToken` text, PRIMARY KEY (`userId`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci').catch((err) => {
         exitErr("Failed to create table users: " + err);
     });
 
@@ -59,7 +59,6 @@
     app.use('/', express.static('public'));
 
     io.on('connection', (socket) => {
-        socket.uniqueId = generateUID();
         socket.authToken = "not_logged_in";
 
         socket.on("update auth token", (data, answer) => {
@@ -67,15 +66,7 @@
             answer({success: 1, data: {}});
         });
 
-        socket.on("verify auth token", (data, answer) => {
-            if(getUserBySocket(socket) == null) {
-                answer({success: 0, data: "No matching user account was found"});
-            }else {
-                answer({success: 1, data: ""});
-            }
-        });
-
-        socket.on("create account", (data, answer) => {
+        socket.on("create account", async (data, answer) => {
             if(!(username in data) || !(password in data)) {
                 answer({success: 0, data: "No username/password provided"});
                 return;
@@ -96,19 +87,14 @@
                 return;
             }
 
-            bcrypt.hash(data.password).then((hash) => {
-                users[generateUID(16)] = ({
-                    "username": data.username,
-                    "passwordHash": hash,
-                    "role": "0",
-                    "authToken": "NOT_LOGGED_IN",
-                });
+            bcrypt.hash(data.password).then(async (hash) => {
+                var [rows] = await connection.query("INSERT INTO users (username, passwordHash, assignedRole, authToken) VALUES (?, ?, 1, ?')", [data.username, hash, generateUID(32)]);
 
                 answer({success: 1, data: "You can now log in."});
             });
         });
 
-        socket.on("login account", (data, answer) => {
+        socket.on("login account", async (data, answer) => {
             if(!(username in data) || !(password in data)) {
                 answer({success: 0, data: "No username/password provided"});
                 return;
@@ -124,19 +110,20 @@
                 return;
             }
 
-            var user = getUserBy("username", data.username);
+            var [rows] = await connection.query("SELECT * FROM users WHERE username=?", [data.username]);
 
-            if(user == null) {
+            if(rows.length < 1) {
                 answer(fail("Username or password invalid."));
                 return;
             }
 
-            bcrypt.compare(data.password, users[user].passwordHash).then((isValid) => {
+            bcrypt.compare(data.password, rows[0].passwordHash).then(async (isValid) => {
                 if(isValid) {
-                    users[user].authToken = generateUID(16);
-                    socket.authToken = users[user].authToken;
+                    var authToken = generateUID(32);
 
-                    answer(success(users[user].authToken)); // Also send to user to save auth token for later resend
+                    var [updateRows] = await connection.query("UPDATE users SET authToken=? WHERE id=?", [authToken, rows[0].id]);
+                    socket.authToken = authToken;
+                    answer(success(authToken)); // Also send to user to save auth token for later resend
                 }else {
                     answer(fail("Username or password invalid."));
                 }
