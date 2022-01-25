@@ -25,9 +25,36 @@
         exitErr("Failed to connect to database: " + err);
     });
 
-    const [rows, fields] = await connection.query(fs.readFileSync("data/sql/basicSetup.sql")).catch((err) => {
-        exitErr("Failed to setup database: " + err);
+    await connection.query("CREATE DATABASE IF NOT EXISTS epicchat;").catch((err) => {
+        exitErr("Failed to create database: " + err);
     });
+
+    await connection.query("USE epicchat;").catch((err) => {
+        exitErr("Failed to select database: " + err);
+    });
+
+    await connection.query('CREATE TABLE IF NOT EXISTS `messages` (`id` int NOT NULL AUTO_INCREMENT, `authorId` int DEFAULT NULL, `content` mediumtext, PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci').catch((err) => {
+        exitErr("Failed to create table messages: " + err);
+    });
+
+    await connection.query('CREATE TABLE IF NOT EXISTS `users` ( `userId` int NOT NULL AUTO_INCREMENT, `username` text, `passwordHash` text, `assignedRole` int DEFAULT NULL, PRIMARY KEY (`userId`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci').catch((err) => {
+        exitErr("Failed to create table users: " + err);
+    });
+
+    await connection.query('CREATE TABLE IF NOT EXISTS `roles` (`id` int NOT NULL AUTO_INCREMENT,`name` text,`color` tinytext,`permissionWrite` tinyint DEFAULT NULL,`permissionDeleteOther` tinyint DEFAULT NULL,`permissionBan` tinyint DEFAULT NULL,PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci').catch((err) => {
+        exitErr("Failed to create table roles: " + err);
+    });
+
+    var [rows] = await connection.query("SELECT * FROM roles WHERE name='everyone'").catch((err) => {
+        exitErr("Failed to check if default role exists: " + err);
+    });
+
+    if(rows.length < 1) {
+        console.log("No default role, creating it.");
+        await connection.query("INSERT INTO roles (name, color, permissionWrite, permissionDeleteOther, permissionBan) VALUES ('everyone', '#000000', 1, 0, 0)").catch((err) => {
+            exitErr("Failed to create default role: " + err);
+        });
+    }
 
     app.use('/', express.static('public'));
 
