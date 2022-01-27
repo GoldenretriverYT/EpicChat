@@ -6,6 +6,7 @@
     const { Server } = require("socket.io");
 
     var config = require("./chatConfig.json");
+    var sockets = {};
 
     /* Setting up web server & socket.io */
     const app = express();
@@ -60,6 +61,7 @@
 
     io.on('connection', (socket) => {
         socket.authToken = "not_logged_in";
+        sockets[socket.id] = socket;
 
         socket.on("update auth token", (data, answer) => {
             socket.authToken = data;
@@ -67,17 +69,17 @@
         });
 
         socket.on("create account", async (data, answer) => {
-            if(!(username in data) || !(password in data)) {
+            if(!("username" in data) || !("password" in data)) {
                 answer({success: 0, data: "No username/password provided"});
                 return;
             }
 
-            if(data.username.length < 3 || data.user.length > 20) {
+            if(data.username.length < 3 || data.username.length > 20) {
                 answer({success: 0, data: "Username too short or too long. (3-20 chars)"});
                 return;
             }
 
-            if(data.username.match(/([^A-Za-z0-9_])/g).length > 0) {
+            if((data.username.match(/([^A-Za-z0-9_])/g) || []).length > 0) {
                 answer({success: 0, data: "Username includes invalid characters (allowed: a-zA-Z0-9_)"});
                 return;
             }
@@ -87,25 +89,25 @@
                 return;
             }
 
-            bcrypt.hash(data.password).then(async (hash) => {
-                var [rows] = await connection.query("INSERT INTO users (username, passwordHash, assignedRole, authToken) VALUES (?, ?, 1, ?')", [data.username, hash, generateUID(32)]);
+            bcrypt.hash(data.password, 10).then(async (hash) => {
+                var [rows] = await connection.query("INSERT INTO users (username, passwordHash, assignedRole, authToken) VALUES (?, ?, 1, ?)", [data.username, hash, generateUID(32)]);
 
                 answer({success: 1, data: "You can now log in."});
             });
         });
 
         socket.on("login account", async (data, answer) => {
-            if(!(username in data) || !(password in data)) {
+            if(!("username" in data) || !("password" in data)) {
                 answer({success: 0, data: "No username/password provided"});
                 return;
             }
 
-            if(data.username.length < 3 || data.user.length > 20) {
+            if(data.username.length < 3 || data.username.length > 20) {
                 answer({success: 0, data: "Username too short or too long. (3-20 chars)"});
                 return;
             }
 
-            if(data.username.match(/([^A-Za-z0-9_])/g).length > 0) {
+            if((data.username.match(/([^A-Za-z0-9_])/g) || []).length > 0) {
                 answer({success: 0, data: "Username includes invalid characters (allowed: a-zA-Z0-9_)"});
                 return;
             }
@@ -121,13 +123,64 @@
                 if(isValid) {
                     var authToken = generateUID(32);
 
-                    var [updateRows] = await connection.query("UPDATE users SET authToken=? WHERE id=?", [authToken, rows[0].id]);
+                    var [results] = await connection.query("UPDATE users SET authToken=? WHERE userId=?", [authToken, rows[0].userId]);
                     socket.authToken = authToken;
+                    socket.join("actualChat");
                     answer(success(authToken)); // Also send to user to save auth token for later resend
                 }else {
                     answer(fail("Username or password invalid."));
                 }
             });
+        });
+
+        socket.on("send message", async (data, answer) => {
+            var user = await getUserBySocket(socket);
+
+            if(user == null) {
+                answer(fail("You are not logged in."));
+                return;
+            }
+
+            if(!("content" in data)) {
+                answer(fail("Invalid/no content provided"));
+                return;
+            }
+
+            if(data.content.trim().length > 2000 || data.content.trim().length < 1) {
+                answer(fail("Your message can be 2000 characters at most and must be at least 1 character long."));
+                return;
+            }
+
+            var [rows] = await connection.query("INSERT INTO messages (authorId, content) VALUES (?, ?)", [user.id, data.content.replace(/<\/?[^>]+(>|$)/g, "").trim()]).catch((err) => {
+                answer(fail("An internal server error occurred. Oops."));
+                return;
+            });
+
+            io.to("actualChat").emit("server send message", {
+                authorId: user.userId,
+                content: data.content
+            });
+        });
+
+        socket.on("get user", async (data, answer) => {
+            var user = await getUserBySocket(socket);
+
+            if(user == null) {
+                answer(fail("You are not logged in."));
+                return;
+            }
+
+            if(!("userId" in data)) {
+                answer(fail("Invalid/no userid provided"));
+                return;
+            }
+
+            var [rows] = await connection.query("SELECT username,assignedRole FROM users WHERE userId=?", [data.userId]).catch((err) => {
+                answer(fail("An internal server error occurred. Oops."));
+                return;
+            });
+
+            answer(success({userData: rows[0]}));
         });
     });
 
@@ -147,24 +200,16 @@
         return res;
     }
 
-    function getUserBySocket(socket) {
-        for(var user of Object.keys(users)) {
-            if(users[user].authToken == socket.authToken) {
-                return user;
-            }
-        }
+    async function getUserBySocket(socket) {
+        console.log(socket.authToken);
+        var [rows] = await connection.query("SELECT * FROM users WHERE authToken=?", [socket.authToken]);
+
+        if(rows.length == 0) return null;
+        return rows[0];
     }
 
-    function getUserBy(field, value) {
-        for(var user of Object.keys(users)) {
-            if(field == "id" && user == value) return user;
-
-            if(field in user && user[field] == value) return user;
-        }
-    }
-
-    function hasPermission(user, permission) {
-        return permission in roles[user.role].permissions;
+    async function hasPermission(user, permission) {
+        var [rows] = await connection.query("SELECT * FROM roles WHERE id=?", [user.assignedRole]);
     }
 
     function fail(data) {

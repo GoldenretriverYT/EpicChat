@@ -9,22 +9,24 @@
         body {
             margin: 0px;
             overflow: hidden;
+            background-color: #1d1d1d;
+            color: white;
         }
 
         .message {
             font-size: 16px;
             line-height: 24px;
-            background-color: #d1d1d1;
+            background-color: #313131;
             border-radius: 3px;
             overflow-wrap: break-word;
         }
 
         .message:nth-child(2n) {
-            background-color: #e9e9e9;
+            background-color: #414141;
         }
 
         .download {
-            background-color: rgb(56, 56, 56);
+            background-color: rgb(54, 45, 45);
             color: white;
             width: 195px;
             height: 40px;
@@ -66,27 +68,147 @@
         .tooltip:hover .tooltiptext {
             visibility: visible;
         }
+
+        input, button {
+            height: 30px;
+            background-color: #313131;
+            color: white;
+            border: 3px solid #505050;
+            border-radius: 5px;
+        }
+
+        input:-internal-autofill-selected {
+            -webkit-box-shadow: 0 0 0 30px #313131 inset !important;
+            -webkit-text-fill-color: white !important;
+        }
+
+        input:focus, button:hover {
+            outline: none;
+            animation: changeInputBorder 0.25s forwards;
+        }
+
+        button:active {
+            background-color: #3b3b3b;
+        }
+
+        @keyframes changeInputBorder {
+            from { border: solid #505050 3px; }
+            to { border: solid #008cff 3px; }
+        }
     </style>
 </head>
 <body>
     <script>
+        /** @returns {HTMLElement} */
+        var $ = (...args) => {return document.querySelector(...args)};
         var socket = io();
         var config = {};
-
+        var templateMessage = `<div class="message" style="width: 100%; min-height: 24px;"><strong>{author}</strong>: {message}</div>`;
         const params = new URLSearchParams(window.location.search);
+        
+        window.addEventListener("load", () => {
+            socket.on("connect", async () => {
+                socket.on("server send message", async (data) => {
+                    var el = document.createElement("div");
+                    var author = await getUserData(data.authorId);
 
-        socket.on("connect", async () => {
-            
+                    document.getElementById("messages").appendChild(el);
+                    el.outerHTML = templateMessage.replace(/\{message\}/g, data.content).replace(/\{author\}/g, author.username);
+                });
+            });
         });
+
+        function createAccount() {
+            var usernameInput = $("#usernameInput");
+            var passwordInput = $("#passwordInput");
+
+            console.log("a");
+
+            socket.emit("create account", {
+                username: usernameInput.value,
+                password: passwordInput.value
+            }, (answer) => {
+                console.log(answer);
+
+                if(answer.success == 0) {
+                    alert(answer.data);
+                }else {
+                    alert(answer.data);
+                }
+            })
+        }
+
+        function login() {
+            var usernameInput = $("#usernameInput");
+            var passwordInput = $("#passwordInput");
+
+            socket.emit("login account", {
+                username: usernameInput.value,
+                password: passwordInput.value
+            }, (answer) => {
+                console.log(answer);
+                
+                if(answer.success == 1) {
+                    $("#chat").style.display = "";
+                    $("#login").style.display = "none";
+                }else {
+                    alert(answer.data);
+                }
+            })
+        }
+
+        function sendMessage() {
+            var messageInput = $("#messageInput");
+
+            socket.emit("send message", {content: messageInput.value}, (answer) => {
+                if(answer.success == 0) {
+                    alert("Failed: " + answer.data);
+                }
+            });
+        }
+
+        function getUserData(userId) {
+            return new Promise((resolve, reject) => {
+                socket.emit("get user", {userId: userId}, (res) => {
+                    console.log(res);
+
+                    if(res.success == 1) {
+                        resolve(res.data.userData);
+                    }else {
+                        console.warn("[User Managment] Failed to get user by id " + userId);
+                        reject("Error getting userdata for id " + userId);
+                    }
+                });
+            });
+        }
     </script>
 
-    <div id="messages" style="height: calc(100vh - 40px); overflow: auto">
-    </div>
-    <div id="send" style="height: 40px;">
-        <input id="msginput" type="text" style="margin-left: 0px; height: 40px; font-size: 18px; width: calc(100vw - 150px); display: inline;" maxlength="2000"></input>
-        <button style="width: 60px; height: 40px; display: inline;" onclick="sendMessage();">Send</button> or
-        <button style="width: 60px; height: 40px; display: inline;" onclick="uploadPrompt();">Upload</button>
+    <div id="login">
+        <center>
+            <div style="width: 60vw">
+                <h1 style="margin-top: 15px;">Login</h1>
+                <label for="usernameInput" style="float: left;">Username</label><br>
+                <input style="width: 60vw;" type="text" autocomplete="username" placeholder="Username" maxlength="20" id="usernameInput">
+
+                <label for="passwordInput" style="float: left; margin-top: 5px;">Password</label><br>
+                <input style="width: 60vw;" type="password" autocomplete="current-password" placeholder="Password" id="passwordInput">
+
+                <button style="width: calc(30vw - 2.5px); margin-top: 30px;" onclick="login();">Login</button>
+                <button style="width: calc(30vw - 2.5px);" onclick="createAccount();">Create account</button>
+            </div>
+        </center>
     </div>
 
-    <input id="file-input" type="file" name="name" style="display: none;"/>
+    <div id="chat" style="height:100vh; width:100vw; display: none;">
+        <div id="messages" style="height: calc(100vh - 40px); overflow: auto">
+
+        </div>
+        <div id="send" style="height: 40px;">
+            <input id="messageInput" type="text" style="margin-left: 0px; height: 40px; font-size: 18px; width: calc(100vw - 150px); display: inline;" maxlength="2000"></input>
+            <button style="width: 60px; height: 40px; display: inline;" onclick="sendMessage();">Send</button> or
+            <button style="width: 60px; height: 40px; display: inline;" onclick="uploadPrompt();">Upload</button>
+        </div>
+
+        <input id="file-input" type="file" name="name" style="display: none;"/>
+    </div>
 </body>

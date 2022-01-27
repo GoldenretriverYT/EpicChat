@@ -1,0 +1,11 @@
+{
+    "data": {
+        "type": "mysql",
+        "host": "127.0.0.1",
+        "user": "root",
+        "pass": "Example123"
+    },
+    "maxMessageLength": 2000,
+    "port": 6060,
+    "maxFileSizeKB": 16384
+}
