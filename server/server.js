@@ -151,7 +151,7 @@
                 return;
             }
 
-            var [rows] = await connection.query("INSERT INTO messages (authorId, content) VALUES (?, ?)", [user.id, data.content.replace(/<\/?[^>]+(>|$)/g, "").trim()]).catch((err) => {
+            var [rows] = await connection.query("INSERT INTO messages (authorId, content) VALUES (?, ?)", [user.userId, data.content.replace(/<\/?[^>]+(>|$)/g, "").trim()]).catch((err) => {
                 answer(fail("An internal server error occurred. Oops."));
                 return;
             });
@@ -160,6 +160,8 @@
                 authorId: user.userId,
                 content: data.content
             });
+
+            answer(success("ok"));
         });
 
         socket.on("get user", async (data, answer) => {
@@ -181,6 +183,26 @@
             });
 
             answer(success({userData: rows[0]}));
+        });
+
+        socket.on("get messages", async (data, answer) => {
+            var user = await getUserBySocket(socket);
+
+            if(user == null) {
+                answer(fail("You are not logged in."));
+                return;
+            }
+
+            var [rows] = await (connection.query(`SELECT * FROM (
+                                                    SELECT * FROM messages WHERE id < ? ORDER BY id DESC LIMIT 100
+                                                    ) sub
+                                                ORDER BY id ASC`, [("fromId" in data ? data.fromId : 0)]).catch((err) => {
+                answer(fail("An internal server error occurred. Oops."));
+                console.log(err);
+                return;
+            }));
+
+            answer(success({messages: rows}));
         });
     });
 

@@ -77,6 +77,30 @@
             border-radius: 5px;
         }
 
+        .embed {
+            background-color: #202020;
+            max-width: 70vw;
+            min-width: 200px;
+            display: inline-block;
+            vertical-align: top;
+            color: white;
+            border-radius: 5px;
+            padding-left: 5px;
+            margin: 5 5 5 5;
+        }
+
+        .embed > h3 {
+            margin-top: 3px;
+            font-weight: 600;
+            font-size: 24px;
+            margin-bottom: 0px;
+        }
+
+        .embed > span {
+            font-size: 14px;
+            margin-top: 3px;
+        }
+
         input:-internal-autofill-selected {
             -webkit-box-shadow: 0 0 0 30px #313131 inset !important;
             -webkit-text-fill-color: white !important;
@@ -103,26 +127,137 @@
         var $ = (...args) => {return document.querySelector(...args)};
         var socket = io();
         var config = {};
-        var templateMessage = `<div class="message" style="width: 100%; min-height: 24px;"><strong>{author}</strong>: {message}</div>`;
+        var loggedIn = false;
+        var templateMessage = `<div class="message" data-messageId="{messageId}" style="width: 100%; min-height: 24px;"><strong>{author}</strong>: {message}</div>`;
+        var templateEmbed = `<div class="message" data-messageId="{messageId}" style="width: 100%; min-height: 24px;"><strong>{author}</strong>: 
+                <div class="embed" style="border-left: 3px solid {embedColor};">
+                    <h3>{embedTitle}</h3>
+                    <span>{embedDescription}</span>
+                </div>
+            </div>`;
         const params = new URLSearchParams(window.location.search);
+
+        var commands = {
+            "alert": {
+                args: [{type: "string", argName: "text"}],
+                onExecute: (args) => {
+                    alert(args["text"]);
+                }
+            }
+        }
         
         window.addEventListener("load", () => {
             socket.on("connect", async () => {
                 socket.on("server send message", async (data) => {
-                    var el = document.createElement("div");
                     var author = await getUserData(data.authorId);
-
-                    document.getElementById("messages").appendChild(el);
-                    el.outerHTML = templateMessage.replace(/\{message\}/g, data.content).replace(/\{author\}/g, author.username);
+                    addMessage(data, author);
                 });
             });
+
+            $("#messages").addEventListener("scroll", (ev) => {
+                if($("#messages").scrollTop == 0) {
+                    var i = 0;
+                    var emergencyStop = 100;
+
+                    while($("#messages").children[i].getAttribute("data-messageId") < 0) {
+                        i++;
+                        
+                        if(i > emergencyStop) {
+                            addSystemMessage("ERROR! Unable to find last real message.");
+                            throw "oof";
+                        }
+                    }
+
+                    loadMessages($("#messages").children[i].getAttribute("data-messageId"), $("#messages").children[0].getAttribute("data-messageId"), false);
+                }
+            });
         });
+
+        window.addEventListener("keypress", (ev) => {
+            if(loggedIn && ev.key == "Enter") {
+                sendMessage();
+            }
+
+            updateAutoCompletes();
+        });
+
+        function updateAutoCompletes() {
+            setTimeout(() => {
+                var input = $("#messageInput");
+                var autoCompletes = $("#autoCompletes");
+                var html = "";
+
+                if(input.value.startsWith("/")) {
+                    for(var command of Object.keys(commands)) {
+                        if(command.startsWith(input.value.substr(1))) {
+                            html += `<option value="/${command}">`;
+                        }
+                    }
+                }
+
+                autoCompletes.innerHTML = html;
+            }, 10);
+        }
+
+        function addSystemMessage(text, isEmbed = false) {
+            addMessage({
+                id: -1,
+                content: text,
+                isEmbed: isEmbed
+            }, {
+                username: "[SYSTEM]",
+                userId: -1,
+                assignedRole: -1
+            })
+        }
+
+        function loadMessages(fromId = Number.MAX_SAFE_INTEGER, insertBefore = null, shouldScroll = true) {
+            socket.emit("get messages", {fromId: fromId}, async (data) => {
+                for(var message of data.data.messages) {
+                    var author = await getUserData(message.authorId);
+                    addMessage(message, author, insertBefore, shouldScroll);
+                }
+            });
+        }
+
+        function addMessage(message, author, insertBefore = null, shouldScroll = true) {
+            var el = document.createElement("div");
+
+            var curScrollPos = $("#messages").scrollTop;
+            var oldScroll = $("#messages").scrollHeight - $("#messages").clientHeight;
+
+            if(insertBefore == null) {
+                document.getElementById("messages").appendChild(el);
+            }else {
+                console.log(insertBefore);
+                document.getElementById("messages").insertBefore(el, document.querySelector("[data-messageId=\"" + insertBefore + "\"]"));
+            }
+
+            if(!message.isEmbed) {
+                el.outerHTML = templateMessage
+                    .replace(/\{messageId\}/g, message.id)
+                    .replace(/\{message\}/g, message.content)
+                    .replace(/\{author\}/g, author.username);
+            }else {
+                el.outerHTML = templateEmbed
+                    .replace(/\{messageId\}/g, message.id)
+                    .replace(/\{embedTitle\}/g, message.content.embedTitle)
+                    .replace(/\{embedDescription\}/g, message.content.embedDescription)
+                    .replace(/\{embedColor\}/g, message.content.embedColor)
+                    .replace(/\{author\}/g, author.username);
+            }
+
+            if(shouldScroll) document.getElementById("messages").scrollTo(0, document.getElementById("messages").scrollHeight);
+
+            if(!shouldScroll && insertBefore != null) {
+                var newScroll = $("#messages").scrollHeight - $("#messages").clientHeight;
+                $("#messages").scrollTop = curScrollPos + (newScroll - oldScroll);
+            }
+        }
 
         function createAccount() {
             var usernameInput = $("#usernameInput");
             var passwordInput = $("#passwordInput");
-
-            console.log("a");
 
             socket.emit("create account", {
                 username: usernameInput.value,
@@ -151,6 +286,9 @@
                 if(answer.success == 1) {
                     $("#chat").style.display = "";
                     $("#login").style.display = "none";
+
+                    loggedIn = true;
+                    loadMessages();
                 }else {
                     alert(answer.data);
                 }
@@ -162,7 +300,9 @@
 
             socket.emit("send message", {content: messageInput.value}, (answer) => {
                 if(answer.success == 0) {
-                    alert("Failed: " + answer.data);
+                    addSystemMessage(answer.data);
+                }else {
+                    messageInput.value = "";
                 }
             });
         }
@@ -203,8 +343,12 @@
         <div id="messages" style="height: calc(100vh - 40px); overflow: auto">
 
         </div>
+        
         <div id="send" style="height: 40px;">
-            <input id="messageInput" type="text" style="margin-left: 0px; height: 40px; font-size: 18px; width: calc(100vw - 150px); display: inline;" maxlength="2000"></input>
+            <input id="messageInput" list="autoCompletes" autocomplete="none" type="text" style="margin-left: 0px; height: 40px; font-size: 18px; width: calc(100vw - 150px); display: inline;" maxlength="2000"></input>
+            
+            <datalist id="autoCompletes"></datalist>
+
             <button style="width: 60px; height: 40px; display: inline;" onclick="sendMessage();">Send</button> or
             <button style="width: 60px; height: 40px; display: inline;" onclick="uploadPrompt();">Upload</button>
         </div>
