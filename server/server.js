@@ -34,15 +34,15 @@
         exitErr("Failed to select database: " + err);
     });
 
-    await connection.query('CREATE TABLE IF NOT EXISTS `messages` (`id` int NOT NULL AUTO_INCREMENT, `authorId` int DEFAULT NULL, `content` mediumtext, PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci').catch((err) => {
+    await connection.query('CREATE TABLE IF NOT EXISTS `messages` (`id` int NOT NULL AUTO_INCREMENT, `authorId` int DEFAULT NULL, `content` mediumtext, PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci').catch((err) => {
         exitErr("Failed to create table messages: " + err);
     });
 
-    await connection.query('CREATE TABLE IF NOT EXISTS `users` ( `userId` int NOT NULL AUTO_INCREMENT, `username` text, `passwordHash` text, `assignedRole` int DEFAULT NULL, `authToken` text, PRIMARY KEY (`userId`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci').catch((err) => {
+    await connection.query('CREATE TABLE IF NOT EXISTS `users` ( `userId` int NOT NULL AUTO_INCREMENT, `username` text, `passwordHash` text, `assignedRole` int DEFAULT NULL, `authToken` text, PRIMARY KEY (`userId`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci').catch((err) => {
         exitErr("Failed to create table users: " + err);
     });
 
-    await connection.query('CREATE TABLE IF NOT EXISTS `roles` (`id` int NOT NULL AUTO_INCREMENT,`name` text,`color` tinytext,`permissionWrite` tinyint DEFAULT NULL,`permissionDeleteOther` tinyint DEFAULT NULL,`permissionBan` tinyint DEFAULT NULL,PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci').catch((err) => {
+    await connection.query('CREATE TABLE IF NOT EXISTS `roles` (`id` int NOT NULL AUTO_INCREMENT,`name` text,`color` tinytext,`permissionWrite` tinyint DEFAULT NULL,`permissionDeleteOther` tinyint DEFAULT NULL,`permissionBan` tinyint DEFAULT NULL,`permissionManageRoles` tinyint DEFAULT NULL,PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci').catch((err) => {
         exitErr("Failed to create table roles: " + err);
     });
 
